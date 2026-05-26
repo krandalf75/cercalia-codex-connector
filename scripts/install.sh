@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PLUGIN_NAME="cercalia-services"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SOURCE_PLUGIN_DIR="$REPO_ROOT/plugins/$PLUGIN_NAME"
+TARGET_PLUGINS_DIR="$HOME/plugins"
+TARGET_PLUGIN_DIR="$TARGET_PLUGINS_DIR/$PLUGIN_NAME"
+MARKETPLACE_DIR="$HOME/.agents/plugins"
+MARKETPLACE_FILE="$MARKETPLACE_DIR/marketplace.json"
+
+log() { printf '[install] %s\n' "$1"; }
+warn() { printf '[install][warn] %s\n' "$1"; }
+
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    printf '[install][error] Missing required command: %s\n' "$1" >&2
+    exit 1
+  fi
+}
+
+require_cmd rsync
+
+if [[ ! -d "$SOURCE_PLUGIN_DIR" ]]; then
+  printf '[install][error] Source plugin not found: %s\n' "$SOURCE_PLUGIN_DIR" >&2
+  exit 1
+fi
+
+mkdir -p "$TARGET_PLUGINS_DIR"
+log "Syncing plugin to $TARGET_PLUGIN_DIR"
+rsync -a --delete "$SOURCE_PLUGIN_DIR/" "$TARGET_PLUGIN_DIR/"
+
+mkdir -p "$MARKETPLACE_DIR"
+if [[ ! -f "$MARKETPLACE_FILE" ]]; then
+  log "Creating marketplace file at $MARKETPLACE_FILE"
+  cat > "$MARKETPLACE_FILE" <<JSON
+{
+  "name": "personal",
+  "interface": {
+    "displayName": "Personal"
+  },
+  "plugins": []
+}
+JSON
+fi
+
+log "Updating marketplace entry for $PLUGIN_NAME"
+python3 - <<PY
+import json
+from pathlib import Path
+
+market = Path(r"$MARKETPLACE_FILE")
+name = "$PLUGIN_NAME"
+entry = {
+  "name": name,
+  "source": {"source": "local", "path": f"./plugins/{name}"},
+  "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+  "category": "Productivity"
+}
+
+data = json.loads(market.read_text())
+if "plugins" not in data or not isinstance(data["plugins"], list):
+  data["plugins"] = []
+
+replaced = False
+for i, p in enumerate(data["plugins"]):
+  if isinstance(p, dict) and p.get("name") == name:
+    data["plugins"][i] = entry
+    replaced = True
+    break
+
+if not replaced:
+  data["plugins"].append(entry)
+
+if "name" not in data:
+  data["name"] = "personal"
+if "interface" not in data or not isinstance(data["interface"], dict):
+  data["interface"] = {"displayName": "Personal"}
+if "displayName" not in data["interface"]:
+  data["interface"]["displayName"] = "Personal"
+
+market.write_text(json.dumps(data, indent=2) + "\n")
+PY
+
+if ! command -v node >/dev/null 2>&1; then
+  warn "Node.js is not installed. MCP server may not run until Node.js 18+ is installed."
+fi
+
+if [[ -z "${CERCALIA_API_KEY:-}" ]]; then
+  warn "CERCALIA_API_KEY is not set in current shell."
+  printf 'Add API key to shell profile now? [y/N]: '
+  read -r ans
+  if [[ "$ans" =~ ^[Yy]$ ]]; then
+    shell_name="$(basename "${SHELL:-}")"
+    profile="$HOME/.zshrc"
+    if [[ "$shell_name" == "bash" ]]; then
+      profile="$HOME/.bashrc"
+    fi
+    printf 'Enter your CERCALIA_API_KEY: '
+    read -r key
+    if [[ -n "$key" ]]; then
+      if grep -q '^export CERCALIA_API_KEY=' "$profile" 2>/dev/null; then
+        warn "Existing CERCALIA_API_KEY export found in $profile. Not modifying automatically."
+      else
+        {
+          echo ''
+          echo '# Cercalia Codex Connector'
+          printf 'export CERCALIA_API_KEY="%s"\n' "$key"
+        } >> "$profile"
+        log "Added CERCALIA_API_KEY export to $profile"
+      fi
+    fi
+  fi
+fi
+
+log "Install complete. Restart Codex to refresh plugin catalog."
+log "Installed plugin: $TARGET_PLUGIN_DIR"
+log "Marketplace: $MARKETPLACE_FILE"

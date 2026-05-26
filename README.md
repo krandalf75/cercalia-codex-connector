@@ -2,12 +2,46 @@
 
 Official Cercalia connector for Codex with MCP tools for geocoding, reverse geocoding, routing, static maps, suggest, isochrones, POI/proximity search, and route optimization workflows.
 
+## Quick Install
+
+### One-line install from GitHub
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/krandalf75/cercalia-codex-connector/main/scripts/install.sh)
+```
+
+### Manual install from local clone
+
+```bash
+git clone https://github.com/krandalf75/cercalia-codex-connector.git
+cd cercalia-codex-connector
+./scripts/install.sh
+```
+
+After install, set your API key if not already configured:
+
+```bash
+export CERCALIA_API_KEY="your_api_key"
+```
+
+Restart Codex to refresh plugin catalog.
+
+## Management
+
+```bash
+./scripts/doctor.sh
+./scripts/uninstall.sh
+```
+
 ## Repository Structure
 
 - `plugins/cercalia-services/` - Main Codex plugin
 - `plugins/cercalia-services/mcp/cercalia-mcp/` - MCP server implementation
 - `skills/` - Language-oriented skill prompts/templates
 - `marketplace.json` - Repo-local marketplace entry example
+- `scripts/install.sh` - Automated installer
+- `scripts/uninstall.sh` - Automated uninstaller
+- `scripts/doctor.sh` - Environment/install checks
 
 ## Features
 
@@ -31,12 +65,12 @@ MCP tools currently implemented:
 
 ## Configuration
 
-Set environment variables where MCP runs:
+Environment variables used by MCP server:
 
 - `CERCALIA_API_KEY` (required)
 - `CERCALIA_BASE_URL` (optional, default `https://lb.cercalia.com/services/v2/json`)
 
-## Local Run
+## Local MCP Run
 
 ```bash
 cd plugins/cercalia-services/mcp/cercalia-mcp
@@ -45,31 +79,13 @@ node server.mjs
 
 ## Plugin Wiring
 
-The plugin uses relative MCP path in:
-
-- `plugins/cercalia-services/.mcp.json`
-
-So it is portable across machines/repositories.
+The plugin uses a relative MCP path in `plugins/cercalia-services/.mcp.json`, so it is portable across machines/repositories.
 
 ## Branding Assets
 
 - `plugins/cercalia-services/assets/cercalia-logo.svg`
 - `plugins/cercalia-services/assets/cercalia-avatar.svg`
 - `plugins/cercalia-services/assets/cercalia-favicon.ico`
-
-## Publish Notes
-
-1. Validate plugin:
-
-```bash
-python3 /Users/arovira/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/cercalia-services
-```
-
-2. Push to GitHub:
-
-```bash
-git push -u origin main
-```
 
 ## License
 

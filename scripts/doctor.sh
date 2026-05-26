@@ -39,6 +39,28 @@ else
   status=1
 fi
 
+PLUGIN_MCP_JSON="$PLUGIN_DIR/.mcp.json"
+if [[ -f "$PLUGIN_MCP_JSON" ]]; then
+  if python3 - <<PY
+import json
+from pathlib import Path
+f = Path(r"$PLUGIN_MCP_JSON")
+data = json.loads(f.read_text())
+env = data.get("mcpServers", {}).get("cercalia", {}).get("env", {})
+key = env.get("CERCALIA_API_KEY", "")
+raise SystemExit(0 if isinstance(key, str) and len(key.strip()) > 0 else 1)
+PY
+  then
+    ok "plugin MCP config contains CERCALIA_API_KEY"
+  else
+    err "plugin MCP config missing CERCALIA_API_KEY in $PLUGIN_MCP_JSON"
+    status=1
+  fi
+else
+  err "plugin MCP config missing: $PLUGIN_MCP_JSON"
+  status=1
+fi
+
 if [[ -f "$MARKETPLACE_FILE" ]]; then
   if python3 - <<PY
 import json

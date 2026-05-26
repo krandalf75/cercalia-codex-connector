@@ -6,6 +6,9 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SOURCE_PLUGIN_DIR="$REPO_ROOT/plugins/$PLUGIN_NAME"
 GITHUB_REPO="${GITHUB_REPO:-krandalf75/cercalia-codex-connector}"
 GITHUB_REF="${GITHUB_REF:-main}"
+API_KEY="${CERCALIA_API_KEY:-}"
+BASE_URL="${CERCALIA_BASE_URL:-https://lb.cercalia.com/services/v2/json}"
+PERSIST_PROFILE=1
 TARGET_PLUGINS_DIR="$HOME/plugins"
 TARGET_PLUGIN_DIR="$TARGET_PLUGINS_DIR/$PLUGIN_NAME"
 MARKETPLACE_DIR="$HOME/.agents/plugins"
@@ -21,6 +24,28 @@ require_cmd() {
     exit 1
   fi
 }
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --api-key)
+      API_KEY="${2:-}"
+      shift 2
+      ;;
+    --base-url)
+      BASE_URL="${2:-}"
+      shift 2
+      ;;
+    --no-profile)
+      PERSIST_PROFILE=0
+      shift
+      ;;
+    *)
+      printf '[install][error] Unknown argument: %s\n' "$1" >&2
+      printf 'Usage: %s [--api-key <key>] [--base-url <url>] [--no-profile]\n' "$0" >&2
+      exit 1
+      ;;
+  esac
+done
 
 require_cmd rsync
 
@@ -100,30 +125,44 @@ if ! command -v node >/dev/null 2>&1; then
   warn "Node.js is not installed. MCP server may not run until Node.js 18+ is installed."
 fi
 
-if [[ -z "${CERCALIA_API_KEY:-}" ]]; then
-  warn "CERCALIA_API_KEY is not set in current shell."
-  printf 'Add API key to shell profile now? [y/N]: '
-  read -r ans
-  if [[ "$ans" =~ ^[Yy]$ ]]; then
-    shell_name="$(basename "${SHELL:-}")"
-    profile="$HOME/.zshrc"
-    if [[ "$shell_name" == "bash" ]]; then
-      profile="$HOME/.bashrc"
-    fi
-    printf 'Enter your CERCALIA_API_KEY: '
-    read -r key
-    if [[ -n "$key" ]]; then
-      if grep -q '^export CERCALIA_API_KEY=' "$profile" 2>/dev/null; then
-        warn "Existing CERCALIA_API_KEY export found in $profile. Not modifying automatically."
-      else
-        {
-          echo ''
-          echo '# Cercalia Codex Connector'
-          printf 'export CERCALIA_API_KEY="%s"\n' "$key"
-        } >> "$profile"
-        log "Added CERCALIA_API_KEY export to $profile"
-      fi
-    fi
+if [[ -z "$API_KEY" ]]; then
+  printf 'Enter your CERCALIA_API_KEY: '
+  read -r API_KEY
+fi
+
+if [[ -z "$API_KEY" ]]; then
+  printf '[install][error] CERCALIA_API_KEY is required.\n' >&2
+  exit 1
+fi
+
+log "Configuring MCP environment in $TARGET_PLUGIN_DIR/.mcp.json"
+python3 - <<PY
+import json
+from pathlib import Path
+
+f = Path(r"$TARGET_PLUGIN_DIR/.mcp.json")
+data = json.loads(f.read_text())
+srv = data.setdefault("mcpServers", {}).setdefault("cercalia", {})
+env = srv.setdefault("env", {})
+env["CERCALIA_API_KEY"] = r"$API_KEY"
+env["CERCALIA_BASE_URL"] = r"$BASE_URL"
+f.write_text(json.dumps(data, indent=2) + "\n")
+PY
+
+if [[ "$PERSIST_PROFILE" -eq 1 ]]; then
+  shell_name="$(basename "${SHELL:-}")"
+  profile="$HOME/.zshrc"
+  if [[ "$shell_name" == "bash" ]]; then
+    profile="$HOME/.bashrc"
+  fi
+  if [[ ! -f "$profile" ]] || ! grep -q '^export CERCALIA_API_KEY=' "$profile" 2>/dev/null; then
+    {
+      echo ''
+      echo '# Cercalia Codex Connector'
+      printf 'export CERCALIA_API_KEY="%s"\n' "$API_KEY"
+      printf 'export CERCALIA_BASE_URL="%s"\n' "$BASE_URL"
+    } >> "$profile"
+    log "Saved CERCALIA env vars to $profile"
   fi
 fi
 

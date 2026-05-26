@@ -7,7 +7,7 @@ Official Cercalia connector for Codex with MCP tools for geocoding, reverse geoc
 ### One-line install from GitHub
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/krandalf75/cercalia-codex-connector/main/scripts/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/krandalf75/cercalia-codex-connector/main/scripts/install.sh) -- --api-key "your_api_key"
 ```
 
 ### Manual install from local clone
@@ -17,11 +17,9 @@ git clone https://github.com/krandalf75/cercalia-codex-connector.git
 cd cercalia-codex-connector
 ./scripts/install.sh
 ```
-
-After install, set your API key if not already configured:
-
+Or explicitly:
 ```bash
-export CERCALIA_API_KEY="your_api_key"
+./scripts/install.sh --api-key "your_api_key"
 ```
 
 Restart Codex to refresh plugin catalog.
@@ -31,13 +29,13 @@ Restart Codex to refresh plugin catalog.
 ### macOS (zsh/bash)
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/krandalf75/cercalia-codex-connector/main/scripts/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/krandalf75/cercalia-codex-connector/main/scripts/install.sh) -- --api-key "your_api_key"
 ```
 
 ### Linux (bash)
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/krandalf75/cercalia-codex-connector/main/scripts/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/krandalf75/cercalia-codex-connector/main/scripts/install.sh) -- --api-key "your_api_key"
 ```
 
 ### Windows (PowerShell)
@@ -98,6 +96,12 @@ Environment variables used by MCP server:
 
 - `CERCALIA_API_KEY` (required)
 - `CERCALIA_BASE_URL` (optional, default `https://lb.cercalia.com/services/v2/json`)
+
+Installer flags:
+
+- `--api-key <key>` sets API key non-interactively (recommended)
+- `--base-url <url>` overrides endpoint base URL
+- `--no-profile` avoids writing exports to shell profile
 
 ## Local MCP Run
 

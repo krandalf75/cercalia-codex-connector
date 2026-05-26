@@ -27,6 +27,10 @@ require_cmd() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --)
+      shift
+      continue
+      ;;
     --api-key)
       API_KEY="${2:-}"
       shift 2

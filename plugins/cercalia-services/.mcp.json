@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "cercalia": {
+      "command": "node",
+      "args": [
+        "./mcp/cercalia-mcp/server.mjs"
+      ],
+      "env": {
+        "CERCALIA_API_KEY": "${CERCALIA_API_KEY}",
+        "CERCALIA_BASE_URL": "${CERCALIA_BASE_URL}"
+      }
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "cercalia-sdk-typescript",
+  "version": "0.1.0",
+  "description": "Plugin to support Cercalia SDK application development in TypeScript.",
+  "author": {
+    "name": "Cercalia Team"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Cercalia SDK (TypeScript)",
+    "shortDescription": "Develop apps with the Cercalia SDK in TypeScript.",
+    "longDescription": "Language-focused plugin scaffold for building applications with Cercalia SDK services in TypeScript.",
+    "developerName": "Cercalia Team",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Help me build a TypeScript application using the Cercalia SDK."
+  },
+  "mcpServers": "./.mcp.json",
+  "apps": "./.app.json"
+}

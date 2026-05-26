@@ -1,0 +1,42 @@
+{
+  "name": "cercalia-services",
+  "version": "0.1.0",
+  "description": "Official Cercalia connector for geocoding, routing, maps, and geospatial workflows in Codex.",
+  "author": {
+    "name": "Cercalia Team",
+    "url": "https://www.cercalia.com/"
+  },
+  "homepage": "https://docs.cercalia.com/docs/",
+  "repository": "https://github.com/Cercalia",
+  "keywords": [
+    "cercalia",
+    "maps",
+    "geocoding",
+    "routing",
+    "geospatial",
+    "mcp"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Cercalia",
+    "shortDescription": "Geocode, route, and build maps from Codex.",
+    "longDescription": "Cercalia plugin for Codex with MCP tools for geocoding, reverse geocoding, routing, static maps, suggest, isochrones, and proximity workflows.",
+    "developerName": "Cercalia",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://www.cercalia.com/",
+    "defaultPrompt": [
+      "Geocode this address and return coordinates.",
+      "Calculate a route with ETA between these points.",
+      "Generate a static map configuration for these markers."
+    ],
+    "brandColor": "#009B4A",
+    "composerIcon": "./assets/cercalia-avatar.svg",
+    "logo": "./assets/cercalia-logo.svg"
+  },
+  "mcpServers": "./.mcp.json",
+  "apps": "./.app.json"
+}

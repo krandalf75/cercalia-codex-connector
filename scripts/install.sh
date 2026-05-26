@@ -129,6 +129,16 @@ if ! command -v node >/dev/null 2>&1; then
   warn "Node.js is not installed. MCP server may not run until Node.js 18+ is installed."
 fi
 
+if command -v npm >/dev/null 2>&1; then
+  log "Installing MCP server dependencies"
+  (
+    cd "$TARGET_PLUGIN_DIR/mcp/cercalia-mcp"
+    npm install --no-audit --no-fund
+  )
+else
+  warn "npm is not installed. Install Node.js/npm and run npm install in $TARGET_PLUGIN_DIR/mcp/cercalia-mcp"
+fi
+
 if [[ -z "$API_KEY" ]]; then
   printf 'Enter your CERCALIA_API_KEY: '
   read -r API_KEY

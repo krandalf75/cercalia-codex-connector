@@ -39,6 +39,14 @@ else
   status=1
 fi
 
+MCP_NODE_MODULE="$PLUGIN_DIR/mcp/cercalia-mcp/node_modules/@cercalia/sdk/package.json"
+if [[ -f "$MCP_NODE_MODULE" ]]; then
+  ok "MCP dependency installed: @cercalia/sdk"
+else
+  err "missing MCP dependency: @cercalia/sdk (run npm install in $PLUGIN_DIR/mcp/cercalia-mcp)"
+  status=1
+fi
+
 PLUGIN_MCP_JSON="$PLUGIN_DIR/.mcp.json"
 if [[ -f "$PLUGIN_MCP_JSON" ]]; then
   if python3 - <<PY

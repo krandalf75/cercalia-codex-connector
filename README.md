@@ -26,6 +26,35 @@ export CERCALIA_API_KEY="your_api_key"
 
 Restart Codex to refresh plugin catalog.
 
+## OS-specific Install
+
+### macOS (zsh/bash)
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/krandalf75/cercalia-codex-connector/main/scripts/install.sh)
+```
+
+### Linux (bash)
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/krandalf75/cercalia-codex-connector/main/scripts/install.sh)
+```
+
+### Windows (PowerShell)
+
+```powershell
+git clone https://github.com/krandalf75/cercalia-codex-connector.git
+cd cercalia-codex-connector
+wsl bash ./scripts/install.sh
+```
+
+If you do not use WSL, install manually:
+
+1. Copy `plugins/cercalia-services` to `%USERPROFILE%\plugins\cercalia-services`
+2. Add marketplace entry in `%USERPROFILE%\.agents\plugins\marketplace.json`
+3. Set env var: `CERCALIA_API_KEY`
+4. Restart Codex
+
 ## Management
 
 ```bash

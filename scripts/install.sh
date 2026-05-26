@@ -4,10 +4,13 @@ set -euo pipefail
 PLUGIN_NAME="cercalia-services"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SOURCE_PLUGIN_DIR="$REPO_ROOT/plugins/$PLUGIN_NAME"
+GITHUB_REPO="${GITHUB_REPO:-krandalf75/cercalia-codex-connector}"
+GITHUB_REF="${GITHUB_REF:-main}"
 TARGET_PLUGINS_DIR="$HOME/plugins"
 TARGET_PLUGIN_DIR="$TARGET_PLUGINS_DIR/$PLUGIN_NAME"
 MARKETPLACE_DIR="$HOME/.agents/plugins"
 MARKETPLACE_FILE="$MARKETPLACE_DIR/marketplace.json"
+TMP_SOURCE_DIR=""
 
 log() { printf '[install] %s\n' "$1"; }
 warn() { printf '[install][warn] %s\n' "$1"; }
@@ -22,8 +25,19 @@ require_cmd() {
 require_cmd rsync
 
 if [[ ! -d "$SOURCE_PLUGIN_DIR" ]]; then
-  printf '[install][error] Source plugin not found: %s\n' "$SOURCE_PLUGIN_DIR" >&2
-  exit 1
+  require_cmd curl
+  require_cmd tar
+  log "Local source not found. Downloading plugin from GitHub ($GITHUB_REPO@$GITHUB_REF)"
+  TMP_SOURCE_DIR="$(mktemp -d)"
+  trap '[[ -n "$TMP_SOURCE_DIR" && -d "$TMP_SOURCE_DIR" ]] && rm -rf "$TMP_SOURCE_DIR"' EXIT
+  curl -fsSL "https://codeload.github.com/${GITHUB_REPO}/tar.gz/refs/heads/${GITHUB_REF}" \
+    | tar -xz -C "$TMP_SOURCE_DIR"
+  DOWNLOADED_ROOT="$(find "$TMP_SOURCE_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  SOURCE_PLUGIN_DIR="$DOWNLOADED_ROOT/plugins/$PLUGIN_NAME"
+  if [[ ! -d "$SOURCE_PLUGIN_DIR" ]]; then
+    printf '[install][error] Downloaded source missing plugin directory: %s\n' "$SOURCE_PLUGIN_DIR" >&2
+    exit 1
+  fi
 fi
 
 mkdir -p "$TARGET_PLUGINS_DIR"

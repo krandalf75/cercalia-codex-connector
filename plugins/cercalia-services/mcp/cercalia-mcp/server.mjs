@@ -1,4 +1,13 @@
-import { URL } from 'node:url';
+import {
+  CercaliaClient,
+  GeocodingService,
+  IsochroneService,
+  ProximityService,
+  ReverseGeocodingService,
+  RoutingService,
+  StaticMapsService,
+  SuggestService
+} from '@cercalia/sdk';
 
 const API_KEY = process.env.CERCALIA_API_KEY || '';
 const BASE_URL = process.env.CERCALIA_BASE_URL || 'https://lb.cercalia.com/services/v2/json';
@@ -7,10 +16,38 @@ if (!API_KEY) {
   console.error('[cercalia-mcp] Missing CERCALIA_API_KEY environment variable.');
 }
 
+class RawCercaliaService extends CercaliaClient {
+  async requestRaw(params, baseUrl) {
+    const clean = {};
+    Object.entries(params || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') clean[k] = String(v);
+    });
+    return this.request(clean, 'Raw Cercalia request', baseUrl);
+  }
+}
+
+function buildConfig(baseUrl) {
+  return { apiKey: API_KEY, baseUrl: baseUrl || BASE_URL };
+}
+
+function buildServices(baseUrl) {
+  const config = buildConfig(baseUrl);
+  return {
+    geocoding: new GeocodingService(config),
+    reverse: new ReverseGeocodingService(config),
+    routing: new RoutingService(config),
+    staticMaps: new StaticMapsService(config),
+    suggest: new SuggestService(config),
+    isochrones: new IsochroneService(config),
+    proximity: new ProximityService(config),
+    raw: new RawCercaliaService(config)
+  };
+}
+
 const TOOL_DEFS = [
   {
     name: 'check_api_key',
-    description: 'Validate Cercalia API key with a lightweight geocoding request.',
+    description: 'Validate Cercalia API key with a lightweight proximity request.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -21,7 +58,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'geocode',
-    description: 'Geocode an address into coordinates using Cercalia Core REST API.',
+    description: 'Geocode an address into coordinates using Cercalia SDK.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -36,7 +73,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'reverse_geocode',
-    description: 'Reverse geocode coordinates into an address using Cercalia Core REST API.',
+    description: 'Reverse geocode coordinates into an address using Cercalia SDK.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -51,7 +88,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'route',
-    description: 'Calculate a route between origin and destination using Cercalia Core REST API.',
+    description: 'Calculate a route between origin and destination using Cercalia SDK.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -68,7 +105,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'static_map',
-    description: 'Generate a static map response from Cercalia Core REST API.',
+    description: 'Generate a static map response from Cercalia SDK.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -87,7 +124,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'suggest',
-    description: 'Autocomplete addresses and POIs with Cercalia Suggest API.',
+    description: 'Autocomplete addresses and POIs with Cercalia SDK.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -109,7 +146,7 @@ const TOOL_DEFS = [
       properties: {
         lat: { type: 'number' },
         lng: { type: 'number' },
-        isolevels: { type: 'string', description: 'Comma-separated thresholds, e.g. 120000,300000' },
+        isolevels: { type: 'string', description: 'Comma-separated thresholds, e.g. 10,20 or 1000,2000' },
         weight: { type: 'string', description: 'time or distance', default: 'time' },
         method: { type: 'string', description: 'convexhull or concavehull', default: 'concavehull' },
         raw_params: { type: 'object', description: 'Optional raw Cercalia query parameters override.' }
@@ -173,41 +210,8 @@ function send(message) {
   process.stdout.write(`${JSON.stringify(message)}\n`);
 }
 
-async function callCercalia(params, options = {}) {
-  const url = new URL(options.baseUrl || BASE_URL);
-  Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && v !== '') {
-      url.searchParams.set(k, String(v));
-    }
-  });
-  const requestApiKey = options.apiKey || API_KEY;
-  url.searchParams.set('key', requestApiKey);
-
-  const response = await fetch(url.toString(), {
-    method: 'GET',
-    headers: { Accept: 'application/json' }
-  });
-
-  const bodyText = await response.text();
-  if (!response.ok) {
-    const compactBody = bodyText.replace(/\s+/g, ' ').trim().slice(0, 400);
-    const redacted = compactBody
-      .replace(/key=[^&\s]+/gi, 'key=***')
-      .replace(/api[_-]?key[^,\s:]*[:=]\s*[^,\s]+/gi, 'api_key=***');
-    throw new Error(`Cercalia API error ${response.status}: ${redacted}`);
-  }
-
-  try {
-    return JSON.parse(bodyText);
-  } catch {
-    return { raw: bodyText };
-  }
-}
-
 function withRawParams(defaults, rawParams) {
-  if (!rawParams || typeof rawParams !== 'object') {
-    return defaults;
-  }
+  if (!rawParams || typeof rawParams !== 'object') return defaults;
   return { ...defaults, ...rawParams };
 }
 
@@ -223,135 +227,242 @@ function requireNumber(value, name, toolName) {
   }
 }
 
+function parseExtent(extent) {
+  if (!extent || typeof extent !== 'string' || !extent.includes('|')) return undefined;
+  const [ul, lr] = extent.split('|');
+  const [ulLat, ulLng] = ul.split(',').map(Number);
+  const [lrLat, lrLng] = lr.split(',').map(Number);
+  if ([ulLat, ulLng, lrLat, lrLng].some((n) => Number.isNaN(n))) return undefined;
+  return {
+    upperLeft: { lat: ulLat, lng: ulLng },
+    lowerRight: { lat: lrLat, lng: lrLng }
+  };
+}
+
+function parseLevels(input) {
+  return String(input)
+    .split(',')
+    .map((x) => Number(x.trim()))
+    .filter((x) => Number.isFinite(x));
+}
+
+function parseCategoryList(categories) {
+  if (!categories) return undefined;
+  return String(categories)
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
 async function handleToolCall(name, args) {
+  requireApiKey(name);
+  const services = buildServices(args?.base_url);
+
   switch (name) {
-    case 'geocode':
-      requireApiKey(name);
-      return callCercalia(withRawParams({
-        cmd: 'geocoding',
-        mocs: 'gdd',
-        ocs: 'gdd',
-        st: args.street,
-        ct: args.locality,
-        pcode: args.postal_code,
-        ctryc: args.country_code
-      }, args.raw_params));
+    case 'geocode': {
+      if (args.raw_params) {
+        return services.raw.requestRaw(
+          withRawParams(
+            {
+              cmd: 'geocoding',
+              mocs: 'gdd',
+              ocs: 'gdd',
+              st: args.street,
+              ct: args.locality,
+              pcode: args.postal_code,
+              ctryc: args.country_code
+            },
+            args.raw_params
+          )
+        );
+      }
+      return services.geocoding.geocode({
+        street: args.street,
+        locality: args.locality,
+        postalCode: args.postal_code,
+        countryCode: args.country_code || 'ESP'
+      });
+    }
 
     case 'reverse_geocode':
-      requireApiKey(name);
       requireNumber(args.lat, 'lat', name);
       requireNumber(args.lng, 'lng', name);
-      return callCercalia(withRawParams({
-        cmd: 'inversegeocoding',
-        mocs: args.mocs || 'gdd',
-        mo: `${args.lat},${args.lng}`
-      }, args.raw_params));
+      if (args.raw_params) {
+        return services.raw.requestRaw(
+          withRawParams(
+            {
+              cmd: 'inversegeocoding',
+              mocs: args.mocs || 'gdd',
+              mo: `${args.lat},${args.lng}`
+            },
+            args.raw_params
+          )
+        );
+      }
+      return services.reverse.reverseGeocode({ lat: args.lat, lng: args.lng });
 
     case 'route':
-      requireApiKey(name);
       requireNumber(args.origin_lat, 'origin_lat', name);
       requireNumber(args.origin_lng, 'origin_lng', name);
       requireNumber(args.destination_lat, 'destination_lat', name);
       requireNumber(args.destination_lng, 'destination_lng', name);
-      return callCercalia(withRawParams({
-        cmd: 'route',
-        mocs: 'gdd',
-        ocs: 'gdd',
-        mo: `${args.origin_lat},${args.origin_lng}`,
-        md: `${args.destination_lat},${args.destination_lng}`,
-        rte: args.route_type
-      }, args.raw_params));
+      if (args.raw_params) {
+        return services.raw.requestRaw(
+          withRawParams(
+            {
+              cmd: 'route',
+              mocs: 'gdd',
+              ocs: 'gdd',
+              mo: `${args.origin_lat},${args.origin_lng}`,
+              md: `${args.destination_lat},${args.destination_lng}`,
+              rte: args.route_type
+            },
+            args.raw_params
+          )
+        );
+      }
+      return services.routing.calculateRoute(
+        { lat: args.origin_lat, lng: args.origin_lng },
+        { lat: args.destination_lat, lng: args.destination_lng },
+        args.route_type ? { weight: args.route_type } : undefined
+      );
 
-    case 'static_map':
-      requireApiKey(name);
-      return callCercalia(withRawParams({
-        cmd: 'map',
-        mocs: args.mocs || 'gdd',
-        ctn: args.city,
-        ctryc: args.country_code,
+    case 'static_map': {
+      if (args.raw_params) {
+        return services.raw.requestRaw(
+          withRawParams(
+            {
+              cmd: 'map',
+              mocs: args.mocs || 'gdd',
+              ctn: args.city,
+              ctryc: args.country_code,
+              width: args.width ?? 800,
+              height: args.height ?? 600,
+              extent: args.extent,
+              marker: args.marker
+            },
+            args.raw_params
+          )
+        );
+      }
+      const options = {
         width: args.width ?? 800,
         height: args.height ?? 600,
-        extent: args.extent,
-        marker: args.marker
-      }, args.raw_params));
+        cityName: args.city,
+        countryCode: args.country_code,
+        extent: parseExtent(args.extent)
+      };
+      return services.staticMaps.generateMap(options);
+    }
 
     case 'suggest':
-      requireApiKey(name);
-      return callCercalia(withRawParams({
-        cmd: 'suggest',
-        q: args.text,
-        ct: args.locality,
-        ctryc: args.country_code,
-        nres: args.limit
-      }, args.raw_params));
+      if (args.raw_params) {
+        return services.raw.requestRaw(
+          withRawParams(
+            {
+              cmd: 'suggest',
+              q: args.text,
+              ct: args.locality,
+              ctryc: args.country_code,
+              nres: args.limit
+            },
+            args.raw_params
+          )
+        );
+      }
+      return services.suggest.search({
+        text: args.text,
+        countryCode: args.country_code
+      });
 
-    case 'isochrones':
-      requireApiKey(name);
+    case 'isochrones': {
       requireNumber(args.lat, 'lat', name);
       requireNumber(args.lng, 'lng', name);
-      return callCercalia(withRawParams({
-        cmd: 'isochrone',
-        mocs: '4326',
-        ocs: '4326',
-        mo: `${args.lng},${args.lat}`,
-        isolevels: args.isolevels,
-        weight: args.weight || 'time',
-        method: args.method || 'concavehull'
-      }, args.raw_params));
+      if (args.raw_params) {
+        return services.raw.requestRaw(
+          withRawParams(
+            {
+              cmd: 'isochrone',
+              mocs: '4326',
+              ocs: '4326',
+              mo: `${args.lng},${args.lat}`,
+              isolevels: args.isolevels,
+              weight: args.weight || 'time',
+              method: args.method || 'concavehull'
+            },
+            args.raw_params
+          )
+        );
+      }
+      const levels = parseLevels(args.isolevels);
+      if (!levels.length) throw new Error('isochrones: isolevels must contain numeric values.');
+      return services.isochrones.calculateMultiple(
+        { lat: args.lat, lng: args.lng },
+        levels,
+        { weight: args.weight || 'time', method: args.method || 'concavehull' }
+      );
+    }
 
     case 'poi_search':
-      requireApiKey(name);
       requireNumber(args.lat, 'lat', name);
       requireNumber(args.lng, 'lng', name);
-      return callCercalia(withRawParams({
-        cmd: 'prox',
-        mocs: 'gdd',
-        mo: `${args.lat},${args.lng}`,
-        rad: args.radius,
-        rqpoicats: args.categories,
-        q: args.text
-      }, args.raw_params));
+      return services.raw.requestRaw(
+        withRawParams(
+          {
+            cmd: 'prox',
+            mocs: 'gdd',
+            mo: `${args.lat},${args.lng}`,
+            rad: args.radius,
+            rqpoicats: args.categories,
+            q: args.text
+          },
+          args.raw_params
+        )
+      );
 
-    case 'proximity_search':
-      requireApiKey(name);
+    case 'proximity_search': {
       requireNumber(args.lat, 'lat', name);
       requireNumber(args.lng, 'lng', name);
-      return callCercalia(withRawParams({
-        cmd: 'prox',
-        mocs: 'gdd',
-        mo: `${args.lat},${args.lng}`,
-        rad: args.radius,
-        rqpoicats: args.categories
-      }, args.raw_params));
+      if (args.raw_params) {
+        return services.raw.requestRaw(
+          withRawParams(
+            {
+              cmd: 'prox',
+              mocs: 'gdd',
+              mo: `${args.lat},${args.lng}`,
+              rad: args.radius,
+              rqpoicats: args.categories
+            },
+            args.raw_params
+          )
+        );
+      }
+      const categoryList = parseCategoryList(args.categories);
+      return services.proximity.findNearest({
+        center: { lat: args.lat, lng: args.lng },
+        categories: categoryList,
+        maxRadius: args.radius
+      });
+    }
 
     case 'route_optimization':
-      requireApiKey(name);
       if (!args.cmd && (!args.raw_params || !args.raw_params.cmd)) {
         throw new Error('route_optimization requires cmd in args.cmd or raw_params.cmd as documented by your Cercalia deployment.');
       }
-      return callCercalia(withRawParams({
-        cmd: args.cmd
-      }, args.raw_params));
-
+      return services.raw.requestRaw(withRawParams({ cmd: args.cmd }, args.raw_params));
 
     case 'check_api_key': {
-      requireApiKey(name);
-      const result = await callCercalia(
-        {
-          cmd: 'geocoding',
-          mocs: 'gdd',
-          ocs: 'gdd',
-          st: 'Gran Via, 1',
-          ct: 'Madrid',
-          ctryc: 'ESP'
-        },
-        { apiKey: API_KEY, baseUrl: args.base_url }
-      );
+      const sample = await services.raw.requestRaw({
+        cmd: 'prox',
+        ctn: 'Girona',
+        ctryc: 'ESP',
+        rqge: 'adr'
+      });
       return {
         ok: true,
         message: 'API key is valid.',
         base_url: args.base_url || BASE_URL,
-        sample: result
+        sample
       };
     }
 
@@ -381,7 +492,7 @@ function onMessage(message) {
       result: {
         protocolVersion: '2024-11-05',
         capabilities: { tools: {} },
-        serverInfo: { name: 'cercalia-mcp', version: '0.2.0' }
+        serverInfo: { name: 'cercalia-mcp', version: '0.3.0' }
       }
     });
     return;

@@ -69,14 +69,14 @@ Recommended environment variable names:
 
 ```bash
 # For server-side JavaScript integration
-npm install cercalia-sdk-ts
+npm install @cercalia/sdk
 ```
 
 ## References
 
 - JavaScript Maps docs: https://docs.cercalia.com/docs/sdks/client-side/javascript-maps/
 - Platform docs root: https://docs.cercalia.com/docs/
-- Server-side package option: https://www.npmjs.com/package/cercalia-sdk-ts
+- Server-side package option: https://www.npmjs.com/package/@cercalia/sdk
 
 ## Notes
 

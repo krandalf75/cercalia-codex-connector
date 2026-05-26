@@ -97,7 +97,7 @@ name = "$PLUGIN_NAME"
 entry = {
   "name": name,
   "source": {"source": "local", "path": f"./plugins/{name}"},
-  "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+  "policy": {"installation": "AVAILABLE"},
   "category": "Productivity"
 }
 
